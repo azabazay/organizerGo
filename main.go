@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/abai/organizer/models"
 	"github.com/abai/organizer/storage"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
@@ -130,9 +132,29 @@ func (r *Repository) GetUser(context *fiber.Ctx) error {
 }
 
 func (r *Repository) GetUserEvents(context *fiber.Ctx) error {
+	id := context.Params("id")
+	if id == "" {
+		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
+			"message": "id cannot be empty",
+		})
+
+		return nil
+	}
+
+	idInt, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		context.Status(http.StatusBadRequest).JSON(&fiber.Map{
+			"message": "id has to be numeric",
+		})
+
+		return nil
+	}
+
 	userTimeTableItems := &[]models.TimeTableItem{}
 
-	err := r.DB.Find(userTimeTableItems).Error
+	err = r.DB.Find(userTimeTableItems, models.TimeTableItem{
+		UserID: uint(idInt),
+	}).Error
 	if err != nil {
 		context.Status(http.StatusBadRequest).JSON(
 			&fiber.Map{"message": "could not get events"})
@@ -192,6 +214,14 @@ func main() {
 	}
 
 	app := fiber.New()
+
+	app.Use(cors.New(cors.Config{
+		AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
+		AllowOrigins:     "*",
+		AllowCredentials: true,
+		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+	}))
+
 	r.SetupRoutes(app)
 	app.Listen(":8080")
 }
