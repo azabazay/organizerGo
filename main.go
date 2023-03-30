@@ -1,182 +1,17 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
 	"os"
-	"strconv"
 
-	"github.com/abai/organizer/models"
 	"github.com/abai/organizer/storage"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
+	types "github.com/abai/organizer/types"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
 type Repository struct {
 	DB *gorm.DB
-}
-
-func (r *Repository) CreateEvent(context *fiber.Ctx) error {
-	timeTableItem := models.TimeTableItem{}
-
-	err := context.BodyParser(&timeTableItem)
-	if err != nil {
-		context.Status(http.StatusUnprocessableEntity).JSON(
-			&fiber.Map{"message": "request failed"})
-		return err
-	}
-
-	err = r.DB.Create(&timeTableItem).Error
-	if err != nil {
-		context.Status(http.StatusBadRequest).JSON(
-			&fiber.Map{"message": "failed to create an event"})
-		return err
-	}
-
-	context.Status(http.StatusOK).JSON(
-		&fiber.Map{"message": "event has been added"})
-
-	return nil
-}
-
-func (r *Repository) DeleteEvent(context *fiber.Ctx) error {
-	timeTableItem := models.TimeTableItem{}
-	id := context.Params("id")
-	if id == "" {
-		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
-			"message": "id cannot be empty",
-		})
-
-		return nil
-	}
-
-	err := r.DB.Delete(timeTableItem, id)
-	if err != nil {
-		context.Status(http.StatusBadRequest).JSON(&fiber.Map{
-			"message": "could not delete event",
-		})
-
-		return err.Error
-	}
-
-	context.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "event deleted successfully",
-	})
-
-	return nil
-}
-
-func (r *Repository) GetEvent(context *fiber.Ctx) error {
-	id := context.Params("id")
-	eventModel := &models.TimeTableItem{}
-
-	if id == "" {
-		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
-			"message": "id cannot be empty",
-		})
-
-		return nil
-	}
-
-	fmt.Println("ID is ", id)
-
-	err := r.DB.Where("id = ?", id).First(eventModel).Error
-	if err != nil {
-		context.Status(http.StatusBadRequest).JSON(&fiber.Map{
-			"message": "could not get the event",
-		})
-
-		return err
-	}
-
-	context.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "event fetched successfully",
-		"data":    eventModel,
-	})
-
-	return nil
-}
-
-func (r *Repository) GetUser(context *fiber.Ctx) error {
-	id := context.Params("id")
-	eventModel := &models.User{}
-
-	if id == "" {
-		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
-			"message": "id cannot be empty",
-		})
-
-		return nil
-	}
-
-	fmt.Println("ID is ", id)
-
-	err := r.DB.Where("id = ?", id).First(eventModel).Error
-	if err != nil {
-		context.Status(http.StatusBadRequest).JSON(&fiber.Map{
-			"message": "could not get the user",
-		})
-
-		return err
-	}
-
-	context.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "user fetched successfully",
-		"data":    eventModel,
-	})
-
-	return nil
-}
-
-func (r *Repository) GetUserEvents(context *fiber.Ctx) error {
-	id := context.Params("id")
-	if id == "" {
-		context.Status(http.StatusInternalServerError).JSON(&fiber.Map{
-			"message": "id cannot be empty",
-		})
-
-		return nil
-	}
-
-	idInt, err := strconv.ParseUint(id, 10, 64)
-	if err != nil {
-		context.Status(http.StatusBadRequest).JSON(&fiber.Map{
-			"message": "id has to be numeric",
-		})
-
-		return nil
-	}
-
-	userTimeTableItems := &[]models.TimeTableItem{}
-
-	err = r.DB.Find(userTimeTableItems, models.TimeTableItem{
-		UserID: uint(idInt),
-	}).Error
-	if err != nil {
-		context.Status(http.StatusBadRequest).JSON(
-			&fiber.Map{"message": "could not get events"})
-		return err
-	}
-
-	context.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "events fetched successfully",
-		"data":    userTimeTableItems,
-	})
-
-	return nil
-}
-
-func (r *Repository) SetupRoutes(app *fiber.App) {
-	api := app.Group("/api")
-
-	api.Post("/create_event", r.CreateEvent)
-	api.Delete("/delete_event/:id", r.DeleteEvent)
-	api.Get("/get_event/:id", r.GetEvent)
-	api.Get("/get_user/:id", r.GetUser)
-	api.Get("/get_user_events/:id", r.GetUserEvents)
 }
 
 func main() {
@@ -199,29 +34,34 @@ func main() {
 		log.Fatal("could not load the database")
 	}
 
-	err = models.MigrateUser(db)
+	err = types.MigrateUser(db)
 	if err != nil {
 		log.Fatal("could not migrate User")
 	}
 
-	err = models.MigrateTimeTableItem(db)
+	err = types.MigrateTimeTableItem(db)
 	if err != nil {
 		log.Fatal("could not migrate TimeTableItem")
 	}
 
-	r := Repository{
-		DB: db,
-	}
+	svc := NewUserService(
+		"https://catfact.ninja/fact",
+		db,
+	)
+	svc = NewLoggingService(svc)
 
-	app := fiber.New()
+	apiServer := NewApiServer(svc)
+	log.Fatal(apiServer.Start(":3000"))
 
-	app.Use(cors.New(cors.Config{
-		AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
-		AllowOrigins:     "*",
-		AllowCredentials: true,
-		AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
-	}))
+	// app := fiber.New()
 
-	r.SetupRoutes(app)
-	app.Listen(":8080")
+	// app.Use(cors.New(cors.Config{
+	// 	AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
+	// 	AllowOrigins:     "*",
+	// 	AllowCredentials: true,
+	// 	AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+	// }))
+
+	// r.SetupRoutes(app)
+	// app.Listen(":8080")
 }
