@@ -34,7 +34,13 @@ func (s *ApiServer) Start(listenAddr string) error {
 	return http.ListenAndServe(listenAddr, r)
 }
 
+func enableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+}
+
 func (s *ApiServer) handleGetCatFact(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
 	fact, err := s.svc.GetCatFact(context.Background())
 	if err != nil {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": err.Error()})
@@ -45,6 +51,8 @@ func (s *ApiServer) handleGetCatFact(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleGetUser(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
 	vars := mux.Vars(r)
 	userID, ok := vars["id"]
 	if !ok {
@@ -61,6 +69,8 @@ func (s *ApiServer) handleGetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
 	event := types.TimeTableItem{}
 
 	err := json.NewDecoder(r.Body).Decode(&event)
@@ -83,6 +93,8 @@ func (s *ApiServer) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
 	vars := mux.Vars(r)
 	eventID, ok := vars["id"]
 	if !ok {
@@ -99,6 +111,8 @@ func (s *ApiServer) handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleGetEvent(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
 	vars := mux.Vars(r)
 	eventID, ok := vars["id"]
 	if !ok {
@@ -115,6 +129,8 @@ func (s *ApiServer) handleGetEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *ApiServer) handleGetUserEvents(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+
 	vars := mux.Vars(r)
 	userID, ok := vars["id"]
 	if !ok {

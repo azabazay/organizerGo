@@ -52,16 +52,4 @@ func main() {
 
 	apiServer := NewApiServer(svc)
 	log.Fatal(apiServer.Start(":3000"))
-
-	// app := fiber.New()
-
-	// app.Use(cors.New(cors.Config{
-	// 	AllowHeaders:     "Origin,Content-Type,Accept,Content-Length,Accept-Language,Accept-Encoding,Connection,Access-Control-Allow-Origin",
-	// 	AllowOrigins:     "*",
-	// 	AllowCredentials: true,
-	// 	AllowMethods:     "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
-	// }))
-
-	// r.SetupRoutes(app)
-	// app.Listen(":8080")
 }
